@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>VentaLocal.cl V3.0</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="nav">
+    <a class="brand" href="#"><span class="logo">VL</span>VentaLocal.cl</a>
+    <div class="nav-actions">
+      <button class="btn btn-light" id="exploreBtn">Explorar</button>
+      <button class="btn btn-light" id="authBtn">Ingresar</button>
+      <button class="btn btn-primary" id="publishBtn">+ Publicar gratis</button>
+      <button class="btn btn-light auth-user" id="userBtn" hidden></button>
+      <button class="btn btn-light" id="logoutBtn" hidden>Salir</button>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-inner">
+    <span class="eyebrow">📍 Tu comunidad, tus oportunidades</span>
+    <h1>Compra y vende<br>cerca de ti.</h1>
+    <p>Publica gratis, encuentra oportunidades en tu región y contacta directamente por WhatsApp.</p>
+    <div class="searchbar">
+      <input id="searchInput" placeholder="¿Qué estás buscando?">
+      <select id="searchRegion"></select>
+      <button class="btn btn-primary" id="searchBtn">Buscar</button>
+    </div>
+  </div>
+</section>
+
+<main>
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <h2>Explora por categoría</h2>
+        <p>Encuentra rápido lo que necesitas.</p>
+      </div>
+    </div>
+    <div class="categories" id="categories"></div>
+  </section>
+
+  <section class="section" id="listingsSection">
+    <div class="section-head">
+      <div>
+        <h2>Publicaciones</h2>
+        <p id="resultCount"></p>
+      </div>
+      <button class="btn btn-primary" id="publishBtn2">Publicar aviso</button>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="listing-grid" id="listingGrid"></div>
+    <div class="empty" id="emptyState">No encontramos publicaciones con esos filtros.</div>
+  </section>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <div><strong>VentaLocal.cl</strong><br><span>Compra y vende cerca de ti.</span></div>
+    <div>Una plataforma de TFC SpA · V3.0 · Backend Supabase</div>
+  </div>
+</footer>
+
+
+<div class="modal" id="authModal" aria-hidden="true">
+  <div class="modal-card auth-card">
+    <button class="modal-close" data-close="authModal">×</button>
+    <div class="auth-tabs">
+      <button class="auth-tab active" type="button" data-auth-tab="login">Ingresar</button>
+      <button class="auth-tab" type="button" data-auth-tab="register">Crear cuenta</button>
+    </div>
+
+    <section id="authLoginPanel" class="auth-panel active">
+      <h3>Bienvenido a VentaLocal</h3>
+      <p class="muted">Ingresa para publicar tus avisos.</p>
+      <form id="loginForm" class="auth-form">
+        <div class="field"><label>Correo</label><input id="loginEmail" type="email" required autocomplete="email"></div>
+        <div class="field"><label>Contraseña</label><input id="loginPassword" type="password" required autocomplete="current-password" minlength="6"></div>
+        <button class="btn btn-primary" type="submit">Ingresar</button>
+      </form>
+    </section>
+
+    <section id="authRegisterPanel" class="auth-panel">
+      <h3>Crea tu cuenta</h3>
+      <p class="muted">Tu cuenta quedará asociada a tus publicaciones.</p>
+      <form id="registerForm" class="auth-form">
+        <div class="field"><label>Correo</label><input id="registerEmail" type="email" required autocomplete="email"></div>
+        <div class="field"><label>Contraseña</label><input id="registerPassword" type="password" required autocomplete="new-password" minlength="6"></div>
+        <button class="btn btn-primary" type="submit">Crear cuenta</button>
+      </form>
+    </section>
+    <div id="authMessage" class="auth-message"></div>
+  </div>
+</div>
+
+<div class="modal" id="publishModal" aria-hidden="true">
+  <div class="modal-card publish-card">
+    <button class="modal-close" data-close="publishModal">×</button>
+
+    <section class="step active" id="publishStep1">
+      <h3>Crear publicación</h3>
+      <p class="muted">Paso 1 de 2 · Completa los datos del aviso.</p>
+      <form id="publishForm" class="form-grid">
+        <div class="field">
+          <label for="fCategory">Categoría</label>
+          <select id="fCategory" required></select>
+        </div>
+        <div class="field">
+          <label for="fPrice">Precio</label>
+          <input id="fPrice" type="number" min="0" required placeholder="Ej: 500000">
+        </div>
+        <div class="field">
+          <label for="fRegion">Región</label>
+          <select id="fRegion" required></select>
+        </div>
+        <div class="field">
+          <label for="fCommune">Comuna</label>
+          <select id="fCommune" required></select>
+        </div>
+        <div class="field full">
+          <label for="fTitle">Título</label>
+          <input id="fTitle" required placeholder="Ej: Hyundai Tucson 2017 Diésel">
+        </div>
+        <div class="field full">
+          <label for="fDescription">Descripción</label>
+          <textarea id="fDescription" required placeholder="Describe el producto, servicio o propiedad..."></textarea>
+        </div>
+        <div class="field full">
+          <label for="fPhone">WhatsApp del vendedor</label>
+          <input id="fPhone" required placeholder="56912345678">
+        </div>
+        <div class="field full">
+          <label for="fPhotos">Fotos</label>
+          <div class="uploader">
+            <div class="uploader-title">📸 Cargar hasta 8 fotos</div>
+            <div class="muted small">La primera foto será la principal.</div>
+            <input id="fPhotos" type="file" accept="image/*" multiple>
+            <div class="preview-grid" id="photoPreview"></div>
+          </div>
+        </div>
+        <div class="field full">
+          <button class="btn btn-primary" type="submit">Continuar →</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="step" id="publishStep2">
+      <h3>¿Cómo quieres publicar tu aviso?</h3>
+      <p class="muted">Puedes publicar gratis o pagar por mayor visibilidad.</p>
+      <div class="plans" id="plans">
+        <button class="plan-card selected" data-plan="free" type="button">
+          <span class="plan-title">🆓 Gratis</span>
+          <strong>$0</strong>
+          <small>Publicación estándar</small>
+        </button>
+        <button class="plan-card featured-plan" data-plan="featured" type="button">
+          <span class="plan-title">⭐ Destacada</span>
+          <strong>$2.990</strong>
+          <small>7 días + prioridad</small>
+        </button>
+        <button class="plan-card top-plan" data-plan="top" type="button">
+          <span class="plan-title">🔥 TOP</span>
+          <strong>$5.990</strong>
+          <small>15 días + máxima prioridad</small>
+        </button>
+      </div>
+      <div class="demo-note">Demo: los pagos son simulados. No se realiza ningún cobro real.</div>
+      <div class="actions-row">
+        <button class="btn btn-light" id="backToForm" type="button">← Volver</button>
+        <button class="btn btn-primary" id="finishPublish" type="button">Continuar</button>
+      </div>
+    </section>
+
+    <section class="step" id="publishStep3">
+      <div class="result-box" id="publishResult"></div>
+    </section>
+  </div>
+</div>
+
+<div class="modal" id="detailModal" aria-hidden="true">
+  <div class="modal-card detail-card">
+    <button class="modal-close" data-close="detailModal">×</button>
+    <div class="detail-layout">
+      <div class="detail-gallery">
+        <div class="detail-main" id="detailMain"></div>
+        <div class="thumbs" id="detailThumbs"></div>
+      </div>
+      <div class="detail-info">
+        <div id="detailBadge"></div>
+        <h3 id="detailTitle"></h3>
+        <div class="detail-price" id="detailPrice"></div>
+        <div class="detail-location" id="detailLocation"></div>
+        <div class="detail-description" id="detailDescription"></div>
+        <a class="btn btn-whatsapp" id="detailWhatsApp" target="_blank" rel="noopener">Contactar por WhatsApp</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase-config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
