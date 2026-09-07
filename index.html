@@ -3,8 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>VentaLocal.cl V3.0</title>
+  <title>VentaLocal.cl V3.1</title>
   <link rel="stylesheet" href="css/style.css">
+<style>
+.auth-link-btn{border:0;background:transparent;color:#087f6f;font-weight:800;padding:4px 0 12px;text-align:right;width:100%;cursor:pointer}
+.auth-link-btn:hover{text-decoration:underline}
+</style>
 </head>
 <body>
 <header class="topbar">
@@ -14,6 +18,7 @@
       <button class="btn btn-light" id="exploreBtn">Explorar</button>
       <button class="btn btn-light" id="authBtn">Ingresar</button>
       <button class="btn btn-primary" id="publishBtn">+ Publicar gratis</button>
+      <button class="btn btn-light" id="myListingsBtn" hidden>Mis publicaciones</button>
       <button class="btn btn-light auth-user" id="userBtn" hidden></button>
       <button class="btn btn-light" id="logoutBtn" hidden>Salir</button>
     </div>
@@ -61,7 +66,7 @@
 <footer>
   <div class="footer-inner">
     <div><strong>VentaLocal.cl</strong><br><span>Compra y vende cerca de ti.</span></div>
-    <div>Una plataforma de TFC SpA · V3.0 · Backend Supabase</div>
+    <div>Una plataforma de TFC SpA · V3.1 · Mis publicaciones</div>
   </div>
 </footer>
 
@@ -181,6 +186,49 @@
   </div>
 </div>
 
+<div class="modal" id="myListingsModal" aria-hidden="true">
+  <div class="modal-card manage-card">
+    <button class="modal-close" data-close="myListingsModal">×</button>
+    <div class="manage-head">
+      <div>
+        <h3>Mis publicaciones</h3>
+        <p class="muted">Administra tus avisos, cambia su estado o edita sus datos.</p>
+      </div>
+      <button class="btn btn-primary" id="newListingFromManage" type="button">+ Nueva publicación</button>
+    </div>
+    <div class="manage-filters" id="manageFilters">
+      <button class="chip active" type="button" data-status="">Todas</button>
+      <button class="chip" type="button" data-status="activo">Activas</button>
+      <button class="chip" type="button" data-status="pausado">Pausadas</button>
+      <button class="chip" type="button" data-status="vendido">Vendidas</button>
+    </div>
+    <div id="myListingsContent" class="manage-list"></div>
+  </div>
+</div>
+
+<div class="modal" id="editListingModal" aria-hidden="true">
+  <div class="modal-card publish-card">
+    <button class="modal-close" data-close="editListingModal">×</button>
+    <h3>Editar publicación</h3>
+    <p class="muted">Puedes modificar los datos del aviso. Las fotos se mantienen sin cambios por ahora.</p>
+    <form id="editListingForm" class="form-grid">
+      <input id="editId" type="hidden">
+      <div class="field"><label>Categoría</label><select id="editCategory" required></select></div>
+      <div class="field"><label>Precio</label><input id="editPrice" type="number" min="0" required></div>
+      <div class="field"><label>Región</label><select id="editRegion" required></select></div>
+      <div class="field"><label>Comuna</label><select id="editCommune" required></select></div>
+      <div class="field full"><label>Título</label><input id="editTitle" required></div>
+      <div class="field full"><label>Descripción</label><textarea id="editDescription" required></textarea></div>
+      <div class="field full"><label>WhatsApp</label><input id="editPhone" required></div>
+      <div class="field full edit-actions">
+        <button class="btn btn-light" type="button" data-close="editListingModal">Cancelar</button>
+        <button class="btn btn-primary" type="submit">Guardar cambios</button>
+      </div>
+    </form>
+    <div id="editMessage" class="auth-message"></div>
+  </div>
+</div>
+
 <div class="modal" id="detailModal" aria-hidden="true">
   <div class="modal-card detail-card">
     <button class="modal-close" data-close="detailModal">×</button>
@@ -205,5 +253,37 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-config.js"></script>
 <script src="js/app.js"></script>
+
+  <div class="modal" id="recoveryModal" aria-hidden="true">
+    <div class="modal-card publish-card" style="max-width:520px;">
+      <button class="modal-close" type="button" data-close="recoveryModal">×</button>
+      <div id="recoveryRequestView">
+        <h3>Recuperar contraseña</h3>
+        <p class="muted">Ingresa el correo asociado a tu cuenta y te enviaremos un enlace para crear una nueva contraseña.</p>
+        <div class="field full" style="margin-top:18px;">
+          <label for="recoveryEmail">Correo</label>
+          <input id="recoveryEmail" type="email" autocomplete="email" placeholder="tu@correo.cl">
+        </div>
+        <button class="btn btn-primary" id="sendRecoveryBtn" type="button" style="width:100%;margin-top:18px;">Enviar enlace</button>
+        <div id="recoveryMessage" class="demo-note" style="display:none;"></div>
+      </div>
+
+      <div id="recoveryResetView" style="display:none;">
+        <h3>Crear nueva contraseña</h3>
+        <p class="muted">Elige una contraseña nueva para tu cuenta de VentaLocal.</p>
+        <div class="field full" style="margin-top:18px;">
+          <label for="newPassword">Nueva contraseña</label>
+          <input id="newPassword" type="password" autocomplete="new-password" minlength="6">
+        </div>
+        <div class="field full" style="margin-top:12px;">
+          <label for="newPasswordConfirm">Confirmar contraseña</label>
+          <input id="newPasswordConfirm" type="password" autocomplete="new-password" minlength="6">
+        </div>
+        <button class="btn btn-primary" id="saveNewPasswordBtn" type="button" style="width:100%;margin-top:18px;">Guardar nueva contraseña</button>
+        <div id="resetMessage" class="demo-note" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
