@@ -5,7 +5,9 @@ const state = {
   pendingListing: null,
   photoFiles: [],
   photoPreviewUrls: [],
-  session: null
+  session: null,
+  myListings: [],
+  manageStatus: ""
 };
 
 const $ = (id) => document.getElementById(id);
@@ -14,6 +16,7 @@ async function init(){
   fillRegions();
   fillCategories();
   fillCategorySelect();
+  fillEditSelects();
   fillChips();
   bindEvents();
   await refreshSession();
@@ -33,7 +36,12 @@ function bindEvents(){
   $("publishBtn").addEventListener("click", requestPublish);
   $("publishBtn2").addEventListener("click", requestPublish);
   $("authBtn").addEventListener("click", () => openAuth("login"));
-  $("userBtn").addEventListener("click", () => openAuth("login"));
+  $("userBtn").addEventListener("click", openMyListings);
+  $("myListingsBtn").addEventListener("click", openMyListings);
+  $("newListingFromManage").addEventListener("click", () => { closeModal("myListingsModal"); requestPublish(); });
+  $("editRegion").addEventListener("change", loadEditCommunes);
+  $("editListingForm").addEventListener("submit", saveListingEdits);
+  $("manageFilters").addEventListener("click", e => { const b=e.target.closest("[data-status]"); if(!b)return; state.manageStatus=b.dataset.status; document.querySelectorAll("#manageFilters .chip").forEach(x=>x.classList.toggle("active",x===b)); renderMyListings(); });
   $("logoutBtn").addEventListener("click", logout);
   $("fRegion").addEventListener("change", loadCommunes);
   $("fPhotos").addEventListener("change", handlePhotos);
@@ -78,6 +86,7 @@ function updateAuthUI(){
   $("authBtn").hidden = !!user;
   $("userBtn").hidden = !user;
   $("logoutBtn").hidden = !user;
+  $("myListingsBtn").hidden = !user;
   if (user) $("userBtn").textContent = user.email || "Mi cuenta";
 }
 
@@ -193,6 +202,14 @@ function fillCategories(){
 function fillCategorySelect(){
   $("fCategory").innerHTML = `<option value="">Selecciona categoría</option>` + Object.keys(CATEGORIES).map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join("");
 }
+function fillEditSelects(){
+  $("editCategory").innerHTML = `<option value="">Selecciona categoría</option>` + Object.keys(CATEGORIES).map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join("");
+  $("editRegion").innerHTML = `<option value="">Selecciona región</option>` + Object.keys(GEO).map(r => `<option value="${escapeAttr(r)}">${escapeHtml(r)}</option>`).join("");
+}
+function loadEditCommunes(selected=""){
+  const region=$("editRegion").value; const communes=GEO[region]||[];
+  $("editCommune").innerHTML=`<option value="">Selecciona comuna</option>`+communes.map(c=>`<option value="${escapeAttr(c)}" ${c===selected?"selected":""}>${escapeHtml(c)}</option>`).join("");
+}
 function fillChips(){
   const items = ["", "Vehículos", "Propiedades", "Tecnología", "Servicios"];
   $("chips").innerHTML = items.map((c,i) => `<button class="chip ${i===0?"active":""}" type="button" data-category="${escapeAttr(c)}">${c || "Todos"}</button>`).join("");
@@ -286,6 +303,80 @@ async function savePendingListing(){
   }
 }
 
+
+async function openMyListings(){
+  if(!state.session?.user){ openAuth("login"); return; }
+  state.manageStatus="";
+  document.querySelectorAll("#manageFilters .chip").forEach((x,i)=>x.classList.toggle("active",i===0));
+  openModal("myListingsModal");
+  await loadMyListings();
+}
+
+async function loadMyListings(){
+  $("myListingsContent").innerHTML=`<div class="manage-loading">Cargando tus publicaciones…</div>`;
+  const { data,error }=await supabaseClient.from("publicaciones")
+    .select("id,created_at,titulo,precio,descripcion,categoria,region,comuna,whatsapp,fotos,plan,estado,user_id")
+    .eq("user_id",state.session.user.id)
+    .neq("estado","eliminado")
+    .order("created_at",{ascending:false});
+  if(error){ console.error(error); $("myListingsContent").innerHTML=`<div class="manage-empty">No pudimos cargar tus publicaciones.<br>${escapeHtml(error.message)}</div>`; return; }
+  state.myListings=(data||[]).map(row=>({id:row.id,createdAt:row.created_at,title:row.titulo,price:row.precio,description:row.descripcion,category:row.categoria,region:row.region,commune:row.comuna,phone:row.whatsapp,photos:row.fotos||[],plan:row.plan||"free",status:row.estado,userId:row.user_id}));
+  renderMyListings();
+}
+
+function renderMyListings(){
+  const items=state.myListings.filter(x=>!state.manageStatus||x.status===state.manageStatus);
+  if(!items.length){ $("myListingsContent").innerHTML=`<div class="manage-empty">No tienes publicaciones${state.manageStatus?` con estado “${escapeHtml(state.manageStatus)}”`:" todavía"}.</div>`; return; }
+  $("myListingsContent").innerHTML=items.map(x=>{
+    const photo=x.photos?.[0]?`<img src="${escapeAttr(x.photos[0])}" alt="${escapeAttr(x.title)}">`:`${CATEGORIES[x.category]||"📦"}`;
+    const pauseLabel=x.status==="pausado"?"Reactivar":"Pausar";
+    return `<article class="manage-item" data-manage-id="${x.id}">
+      <div class="manage-photo">${photo}</div>
+      <div class="manage-info"><span class="status-pill ${escapeAttr(x.status)}">${escapeHtml(x.status)}</span><h4>${escapeHtml(x.title)}</h4><div class="manage-price">$${Number(x.price).toLocaleString("es-CL")}</div><div class="manage-meta">📍 ${escapeHtml(x.region)} · ${escapeHtml(x.commune)}</div></div>
+      <div class="manage-actions">
+        <button class="btn btn-light" data-action="edit" type="button">Editar</button>
+        <button class="btn btn-light" data-action="pause" type="button">${pauseLabel}</button>
+        <button class="btn btn-light" data-action="sold" type="button">Vendido</button>
+        <button class="btn btn-danger" data-action="delete" type="button">Eliminar</button>
+      </div></article>`;
+  }).join("");
+  $("myListingsContent").querySelectorAll("[data-action]").forEach(btn=>btn.addEventListener("click",()=>handleManageAction(Number(btn.closest("[data-manage-id]").dataset.manageId),btn.dataset.action)));
+}
+
+async function handleManageAction(id,action){
+  const item=state.myListings.find(x=>x.id===id); if(!item)return;
+  if(action==="edit"){ openEditListing(item); return; }
+  let next;
+  if(action==="pause") next=item.status==="pausado"?"activo":"pausado";
+  if(action==="sold") next="vendido";
+  if(action==="delete"){
+    if(!confirm(`¿Eliminar “${item.title}”? Dejará de aparecer en VentaLocal.`)) return;
+    next="eliminado";
+  }
+  const {error}=await supabaseClient.from("publicaciones").update({estado:next}).eq("id",id).eq("user_id",state.session.user.id);
+  if(error){ alert("No pudimos actualizar la publicación: "+error.message); return; }
+  await Promise.all([loadMyListings(),loadListings()]);
+}
+
+function openEditListing(item){
+  $("editId").value=item.id; $("editTitle").value=item.title; $("editPrice").value=item.price; $("editDescription").value=item.description; $("editPhone").value=item.phone;
+  $("editCategory").value=item.category; $("editRegion").value=item.region; loadEditCommunes(item.commune);
+  $("editMessage").className="auth-message"; $("editMessage").textContent="";
+  openModal("editListingModal");
+}
+
+async function saveListingEdits(e){
+  e.preventDefault();
+  const id=Number($("editId").value);
+  const payload={titulo:$("editTitle").value.trim(),precio:Number($("editPrice").value),descripcion:$("editDescription").value.trim(),categoria:$("editCategory").value,region:$("editRegion").value,comuna:$("editCommune").value,whatsapp:$("editPhone").value.trim()};
+  const box=$("editMessage"); box.className="auth-message show ok"; box.textContent="Guardando cambios…";
+  const {error}=await supabaseClient.from("publicaciones").update(payload).eq("id",id).eq("user_id",state.session.user.id);
+  if(error){ box.className="auth-message show error"; box.textContent=error.message; return; }
+  box.className="auth-message show ok"; box.textContent="Cambios guardados correctamente.";
+  await Promise.all([loadMyListings(),loadListings()]);
+  setTimeout(()=>closeModal("editListingModal"),600);
+}
+
 function openDetail(id){
   const x=state.listings.find(item=>item.id===id); if(!x)return;
   $("detailTitle").textContent=x.title; $("detailPrice").textContent="$"+Number(x.price).toLocaleString("es-CL"); $("detailLocation").textContent=`📍 ${x.region} · ${x.commune}`; $("detailDescription").textContent=x.description;
@@ -303,3 +394,115 @@ function escapeHtml(value){ return String(value??"").replace(/[&<>"']/g,m=>({"&"
 function escapeAttr(value){ return escapeHtml(value); }
 
 document.addEventListener("DOMContentLoaded",init);
+
+
+// ===== Password recovery =====
+function openRecoveryRequest() {
+  const modal = document.getElementById('recoveryModal');
+  const req = document.getElementById('recoveryRequestView');
+  const reset = document.getElementById('recoveryResetView');
+  if (!modal) return;
+  if (req) req.style.display = 'block';
+  if (reset) reset.style.display = 'none';
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+
+  const authModal = document.getElementById('authModal');
+  if (authModal) {
+    authModal.classList.remove('open');
+    authModal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function openRecoveryReset() {
+  const modal = document.getElementById('recoveryModal');
+  const req = document.getElementById('recoveryRequestView');
+  const reset = document.getElementById('recoveryResetView');
+  if (!modal) return;
+  if (req) req.style.display = 'none';
+  if (reset) reset.style.display = 'block';
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+async function sendPasswordRecovery() {
+  const email = (document.getElementById('recoveryEmail')?.value || '').trim();
+  const box = document.getElementById('recoveryMessage');
+  if (!email) {
+    if (box) {
+      box.style.display = 'block';
+      box.textContent = 'Ingresa tu correo.';
+    }
+    return;
+  }
+
+  const redirectTo = 'https://franciscoau.github.io/ventalocal/';
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo });
+
+  if (box) {
+    box.style.display = 'block';
+    if (error) {
+      box.textContent = 'No se pudo enviar el enlace: ' + error.message;
+    } else {
+      box.textContent = 'Listo. Revisa tu correo y abre el enlace para crear una nueva contraseña.';
+    }
+  }
+}
+
+async function saveNewPassword() {
+  const p1 = document.getElementById('newPassword')?.value || '';
+  const p2 = document.getElementById('newPasswordConfirm')?.value || '';
+  const box = document.getElementById('resetMessage');
+
+  if (p1.length < 6) {
+    if (box) {
+      box.style.display = 'block';
+      box.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+    }
+    return;
+  }
+  if (p1 !== p2) {
+    if (box) {
+      box.style.display = 'block';
+      box.textContent = 'Las contraseñas no coinciden.';
+    }
+    return;
+  }
+
+  const { error } = await supabaseClient.auth.updateUser({ password: p1 });
+  if (box) {
+    box.style.display = 'block';
+    box.textContent = error ? ('No se pudo cambiar la contraseña: ' + error.message) : 'Contraseña actualizada correctamente. Ya puedes seguir usando VentaLocal.';
+  }
+
+  if (!error) {
+    setTimeout(() => {
+      document.getElementById('recoveryModal')?.classList.remove('open');
+      document.getElementById('recoveryModal')?.setAttribute('aria-hidden', 'true');
+    }, 1400);
+  }
+}
+
+function wirePasswordRecovery() {
+  document.getElementById('forgotPasswordBtn')?.addEventListener('click', openRecoveryRequest);
+  document.getElementById('sendRecoveryBtn')?.addEventListener('click', sendPasswordRecovery);
+  document.getElementById('saveNewPasswordBtn')?.addEventListener('click', saveNewPassword);
+
+  // Supabase emits PASSWORD_RECOVERY after opening the recovery link.
+  supabaseClient.auth.onAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      openRecoveryReset();
+    }
+  });
+
+  // Fallback for hash-based recovery links.
+  if (window.location.hash && window.location.hash.includes('type=recovery')) {
+    openRecoveryReset();
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', wirePasswordRecovery);
+} else {
+  wirePasswordRecovery();
+}
